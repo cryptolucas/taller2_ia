@@ -95,33 +95,110 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
 
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
-    """
-    Expectimax agent with a mixed hunter model.
 
-    Each hunter acts randomly with probability self.prob and greedily
-    (worst-case / MIN) with probability 1 - self.prob.
 
-    * When prob = 0:  behaves like Minimax (hunters always play optimally).
-    * When prob = 1:  pure expectimax (hunters always play uniformly at random).
-    * When 0 < prob < 1: weighted combination that correctly models the
-      actual MixedHunterAgent used at game-play time.
+    def get_action(self, state):
+        legal_actions = state.get_legal_actions(0) 
+        
+        best_action = None
+        max_v = float('-inf')
+        
+        for action in legal_actions:
+            successor = state.generate_successor(0, action) 
+            
+            v = self.value(successor, 1, self.depth) 
+            
+            if v > max_v:
+                max_v = v
+                best_action = action
+        
+        return best_action
 
-    Chance node formula:
-        value = (1 - p) * min(child_values) + p * mean(child_values)
-    """
-
-    def get_action(self, state: GameState) -> Directions | None:
+    def value(self, estado, indice_agente, profundidad):
         """
-        Returns the best action for the drone using expectimax with mixed hunter model.
-
-        Tips:
-        - Drone nodes are MAX (same as Minimax).
-        - Hunter nodes are CHANCE with mixed model: the hunter acts greedily with
-          probability (1 - self.prob) and uniformly at random with probability self.prob.
-        - Mixed expected value = (1-p) * min(child_values) + p * mean(child_values).
-        - When p=0 this reduces to Minimax; when p=1 it is pure uniform expectimax.
-        - Do NOT prune in expectimax (unlike alpha-beta).
-        - self.prob is set via the constructor argument prob.
+        Gestiona la transición entre agentes y verifica estados terminales.
         """
-        # TODO: Implement your code here
-        return None
+        if estado.is_victory():
+            return 1000
+        
+        if estado.is_lose():
+            return -1000
+
+        if profundidad == 0:
+            return self.evaluation_function(estado)
+
+        if indice_agente == 0:
+            return self.max_value(estado, indice_agente, profundidad)
+        
+        else:
+            return self.exp_value(estado, indice_agente, profundidad)
+
+    def max_value(self, estado, indice_agente, profundidad):
+        """
+        Lógica para el nodo MAX (el Dron).
+        Busca maximizar el valor retornado por los sucesores.
+        """
+        # 1. Obtener las acciones legales para el dron
+        acciones_legales = estado.get_legal_actions(indice_agente)
+        
+        # Si no hay acciones (caso extraño), evaluar el estado actual
+        if not acciones_legales:
+            return self.evaluation_function(estado)
+            
+        valor_maximo = float('-inf')
+        
+        # 2. Iterar sobre cada acción para encontrar el máximo
+        for accion in acciones_legales:
+            sucesor = estado.generate_successor(indice_agente, accion)
+            
+            # Tras mover el dron (agente 0), le toca al primer cazador (agente 1)
+            # No se reduce la profundidad aún, pues el turno completo no ha terminado
+            valor_sucesor = self.value(sucesor, 1, profundidad)
+            
+            valor_maximo = max(valor_maximo, valor_sucesor)
+            
+        return valor_maximo
+
+    def exp_value(self, estado, indice_agente, profundidad):
+
+        acciones_legales = estado.get_legal_actions(indice_agente)
+        if not acciones_legales:
+            return self.evaluation_function(estado)
+
+        accion_optima = None
+        distancia_minima = float('inf')
+        pos_dron = estado.get_drone_position()
+
+        for accion in acciones_legales:
+            sucesor = estado.generate_successor(indice_agente, accion)
+            pos_cazador = sucesor.get_hunter_position(indice_agente)
+            distancia = abs(pos_dron[0] - pos_cazador[0]) + abs(pos_dron[1] - pos_cazador[1])
+            
+            if distancia < distancia_minima:
+                distancia_minima = distancia
+                accion_optima = accion
+
+        p = self.p  
+        num_acciones = len(acciones_legales)
+        prob_aleatoria = p / num_acciones
+        
+        valor_esperado = 0
+        
+        proximo_agente = indice_agente + 1
+        proxima_profundidad = profundidad
+        
+        if proximo_agente >= estado.get_num_agents():
+            proximo_agente = 0
+            proxima_profundidad = profundidad - 1
+
+        for accion in acciones_legales:
+            sucesor = estado.generate_successor(indice_agente, accion)
+            valor_sucesor = self.value(sucesor, proximo_agente, proxima_profundidad)
+            
+            probabilidad = prob_aleatoria
+            if accion == accion_optima:
+                probabilidad += (1 - p)
+            
+            valor_esperado += probabilidad * valor_sucesor
+            
+        return valor_esperado
