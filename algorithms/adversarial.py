@@ -65,8 +65,68 @@ class MinimaxAgent(MultiAgentSearchAgent):
         - The next agent is (agent_index + 1) % num_agents. Depth decreases after all agents have moved (full ply).
         - Return the ACTION (not the value) that maximizes the minimax value for the drone.
         """
-        # TODO: Implement your code here
-        return None
+    #---Minimax recursive function---
+        def minimax_value(current_state: GameState, agent_index: int, depth: int) -> float:
+            #---------------------------------
+            #Caso Base
+            #---------------------------------
+
+            # En A y B se devuelve el estado evaluado si se cumple el condicional, sino se sigue expandiendo el árbol
+            #A. Revisar si se llego al final o el cazador atrapo al dron o si se excedio el depht
+            if current_state.is_win() or current_state.is_lose() or depth == 0:
+                return self.evaluation_function(current_state)
+
+            #B.Revisar si todavia hay acciones legales para el agente actual
+            num_agents = current_state.get_num_agents()
+            legal_actions = current_state.get_legal_actions(agent_index)#
+            if not legal_actions:
+                return self.evaluation_function(current_state)
+            
+            #Calcular el siguiente agente y la profundidad para la siguiente llamada recursiva
+            next_agent = (agent_index + 1) % num_agents
+            next_depth = depth - 1 if next_agent == 0 else depth # Se actualiza el deph si el agente siguiente es el dron
+            #---------------------------------
+            #MAX
+            #---------------------------------
+            if agent_index == 0:
+                # MAX node (drone)
+                max_value = float("-inf")
+                for action in legal_actions:
+                    succ = current_state.generate_successor(agent_index, action)
+                    value = minimax_value(succ, next_agent, next_depth)
+                    if value > max_value:
+                        max_value = value
+                return max_value
+            #---------------------------------
+            #MIN
+            #---------------------------------
+            else:
+                # MIN node (hunter)
+                min_value = float("inf")
+                for action in legal_actions:
+                    succ = current_state.generate_successor(agent_index, action)
+                    value = minimax_value(succ, next_agent, next_depth)
+                    if value < min_value:
+                        min_value = value
+                return min_value
+    #-------------------------------------------------------------------------------
+        # Escoger mejor acción para el nodo raíz MAX (dron) usando minimax
+        legal_actions = state.get_legal_actions(self.index)
+        if not legal_actions:
+            return None
+
+        best_action = None
+        best_value = float("-inf")
+        num_agents = state.get_num_agents()
+
+        for action in legal_actions:
+            succ = state.generate_successor(self.index, action)
+            value = minimax_value(succ, (self.index + 1) % num_agents, self.depth)
+            if value > best_value or best_action is None:
+                best_value = value
+                best_action = action
+
+        return best_action
 
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
@@ -90,9 +150,82 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         - Update beta at MIN nodes: beta = min(beta, value).
         - Pass alpha and beta through the recursive calls.
         """
-        # TODO: Implement your code here (BONUS)
-        return None
+        def alphabeta_value(
+            current_state: GameState,
+            agent_index: int,
+            depth: int,
+            alpha: float,
+            beta: float,
+        ) -> float:
+            #---------------------------------
+            #Caso Base
+            #---------------------------------
 
+            # En A y B se devuelve el estado evaluado si se cumple el condicional, sino se sigue expandiendo el árbol
+            #A. Revisar si se llego al final o el cazador atrapo al dron o si se excedio el depht
+            if current_state.is_win() or current_state.is_lose() or depth == 0:
+                return self.evaluation_function(current_state)
+            
+            #B.Revisar si todavia hay acciones legales para el agente actual
+            num_agents = current_state.get_num_agents()
+            legal_actions = current_state.get_legal_actions(agent_index)
+            if not legal_actions:
+                return self.evaluation_function(current_state)
+
+            next_agent = (agent_index + 1) % num_agents
+            next_depth = depth - 1 if next_agent == 0 else depth
+            #---------------------------------
+            #MAX
+            #---------------------------------
+            if agent_index == 0:
+                # MAX node (drone)
+                value = float("-inf")
+                for action in legal_actions:
+                    succ = current_state.generate_successor(agent_index, action)
+                    value = max(value, alphabeta_value(succ, next_agent, next_depth, alpha, beta))
+                    alpha = max(alpha, value)
+                    #pruning si value > beta, no se evalua el resto de acciones
+                    if value > beta:
+                        return value
+                return value
+            #---------------------------------
+            #MAX
+            #---------------------------------
+            else:
+                value = float("inf")
+                for action in legal_actions:
+                    succ = current_state.generate_successor(agent_index, action)
+                    value = min(value, alphabeta_value(succ, next_agent, next_depth, alpha, beta))
+                    beta = min(beta, value)
+                    if value < alpha:
+                        # pruning si value < alpha.
+                        return value
+                return value
+    #-------------------------------------------------------------------------------
+    # Escoger mejor acción para el nodo raíz MAX (dron) usando minimax
+        legal_actions = state.get_legal_actions(self.index)
+        if not legal_actions:
+            return None
+
+        best_action = None
+        best_value = float("-inf")
+        alpha = float("-inf")
+        beta = float("inf")
+        num_agents = state.get_num_agents()
+
+        for action in legal_actions:
+            succ = state.generate_successor(self.index, action)
+            value = alphabeta_value(succ, (self.index + 1) % num_agents, self.depth, alpha, beta)
+            if value > best_value or best_action is None:
+                best_value = value
+                best_action = action
+    # se actualiza alpha para el nodo raíz MAX después de evaluar cada acción
+            alpha = max(alpha, value)
+            if best_value > beta:
+                # se hace pruning. No se evaulua el resto
+                break
+
+        return best_action
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
 

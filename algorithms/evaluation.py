@@ -11,7 +11,7 @@ def evaluation_function(state: GameState) -> float:
     Combina progreso de entregas, distancia a objetivos y evasión de amenazas.
     """
     pos_dron = state.get_drone_position()
-    pos_cazadores = state.get_hunters_positions()
+    pos_cazadores = state.get_hunter_positions() # Correccion Typo evaluation antes pos_cazadores = state.get_hunter[s]_positions()
     entregas_pendientes = state.get_pending_deliveries()
     layout = state.get_layout()
     puntuacion_actual = state.get_score()
